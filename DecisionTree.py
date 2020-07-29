@@ -25,21 +25,27 @@ class Node:
         self.threshold = 0
         self.left = None
         self.right = None
+        self.leftbranch = False
+        self.rightbranch = False
     
     def str_help(self, depth=0):
         """[Recursive function to help DTC's str function]
         """
         if (self.left == None) & (self.right == None):
-            return f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
-        elif (self.left != None) & (self.right == None):
-            msg = f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
-            msg = msg + "\n" + self.left.str_help(depth=depth+1)
-            return msg
-        elif (self.left == None) & (self.right != None):
-            msg = f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
-            msg = msg + "\n" + self.right.str_help(depth=depth+1)
-            return msg
-        else:
+            # Print left or right leaf depending on if it's a left or right split
+            if self.leftbranch == True:
+                return f"{depth*' '}Left Leaf -> Predicted Class: {self.predicted_class}"
+            if self.rightbranch == True:
+                return f"{depth*' '}Right Leaf -> Predicted Class: {self.predicted_class}"
+        # elif (self.left != None) & (self.right == None):
+        #     msg = f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
+        #     msg = msg + "\n" + self.left.str_help(depth=depth+1)
+        #     return msg
+        # elif (self.left == None) & (self.right != None):
+        #     msg = f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
+        #     msg = msg + "\n" + self.right.str_help(depth=depth+1)
+        #     return msg
+        else:  
             msg = f"{depth*' '}X{self.feature_index}, Threshold: {self.threshold}, Predicted Class: {self.predicted_class}"
             msg = msg + "\n" + self.left.str_help(depth=depth+1) + "\n" + self.right.str_help(depth=depth+1)
             return msg
@@ -67,7 +73,7 @@ class DecisionTreeClassifier:
                 # Return "X{feature_index}, Threshold: {threshold}, Predicted Class: {predicted class}"
         return node.str_help()
 
-    def fit(self, X, y):
+    def fit(self, X:np.array, y:np.array):
         """[Function to fit a decision tree classifier]
 
         Parameters
@@ -86,7 +92,7 @@ class DecisionTreeClassifier:
             [Tree]
                 The decision tree
         """
-        self.num_classes = len(set(y))
+        self.num_classes = len(np.unique(y))
         self.num_features = X.shape[1]
         self.tree = self.grow_tree(X, y)
 
@@ -127,16 +133,8 @@ class DecisionTreeClassifier:
         if num_observations <= 1:
             return None, None
         
-        # Make sure that the target, y, values are ordinally encoded integers
-            # Reshape y array so it works w/ ordinal encoder
-        y = y.reshape(-1, 1)
-        encoder = OrdinalEncoder()
-        y = encoder.fit_transform(y)
-        y = y.astype(int)
-
         # Reshape y back to shape (y.size,)
         y = y.reshape(num_observations,)
-        print(y.dtype)
         
         # Find the count of each class for use in Gini calc later
             # To avoid warning message + future issues:
@@ -175,7 +173,8 @@ class DecisionTreeClassifier:
                 # Default is 0 of all classes to left and everything to right
             num_left = [0] * self.num_classes
             num_right = count_in_parent.copy()
-            # Loop through 
+            # Loop through all observations in the node to efficiently find
+            # ideal threshold and class that minimizes Gini impurities of child nodes
             for i in range(1, num_observations):
                 class_ = obs_classes[i - 1][0]
                 num_left[class_] += 1
@@ -183,37 +182,91 @@ class DecisionTreeClassifier:
                 gini_left = 1.0 - sum((num_left[x] / i) ** 2 for x in range(self.num_classes))
                 gini_right = 1.0 - sum((num_right[x] / (num_observations - i)) ** 2 for x in range(self.num_classes))
                 gini = (i * gini_left + (num_observations - i) * gini_right) / num_observations
+                # Go to the next i if i == i - 1
+                    # Avoids making a split where two values are equal
                 if thresholds[i][0] == thresholds[i - 1][0]:
                     continue
+                # If gini is better than best_gini, re-assign ideals
                 if gini < best_gini:
                     best_gini = gini
                     ideal_col = col
+                    # Get the midpoint between i-th value and previous value
                     ideal_threshold = (thresholds[i][0] + thresholds[i - 1][0]) / 2
         return ideal_col, ideal_threshold
 
     def grow_tree(self, X, y, depth=0):
+        """[Grow tree function to continue adding splits in the tree if depth < max_depth]
+
+        Parameters
+        ----------
+        X : [np.Array]
+            [X/feature values of current node]
+        y : [np.Array]
+            [y/target values of current node]
+        depth : int, optional
+            [depth of current node], by default 0
+
+        Returns
+        -------
+        [Node]
+            [Root Node of the DT]
+        """
         # Get the population for each class of target in current node
             # Fix the same warning issue as before
         with warnings.catch_warnings():
             warnings.filterwarnings(action='ignore', category=FutureWarning)
             pop_per_class = [np.count_nonzero(y == i) for i in range(self.num_classes)]
+        
         # predicted_class is the class w/ highest population
         predicted_class = np.argmax(pop_per_class)
+
+        # Instantiate an empty Node
         node = Node(predicted_class=predicted_class)
+        # If depth >= max_depth then leave it empty and return it
+            # Else grow the tree recursively and return it
         if depth < self.max_depth:
-            col, thr = self.find_split(X, y)
-            if col is not None:
-                indices_left = X[:, col] < thr
+            col, threshold = self.find_split(X, y)
+            if col and threshold:
+                indices_left = X[:, col] < threshold
                 X_left, y_left = X[indices_left], y[indices_left]
-                X_right, y_right = X[~indices_left], y[~indices_left]
+                indices_right = X[:, col] >= threshold
+                X_right, y_right = X[indices_right], y[indices_right]
                 node.feature_index = col
-                node.threshold = thr
-                node.left = self.grow_tree(X_left, y_left, depth + 1)
-                node.right = self.grow_tree(X_right, y_right, depth + 1)
+                node.threshold = threshold
+                node.left = self.grow_tree(X_left, y_left, depth+1)
+                node.left.leftbranch = True
+                node.right = self.grow_tree(X_right, y_right, depth+1)
+                node.right.rightbranch = True
         return node
 
-    def _predict(self, inputs):
+    def _predict(self, inputs, multi_obs=False):
+        """[Function to predict using new X input(s)]
+
+        Parameters
+        ----------
+        inputs : [np.Array or Python list/list of lists]
+            [X/feature test data]
+
+        Returns
+        -------
+        [integer or np.Array of shape (observations, 1)]
+            [Predicted target class(es) of the test data]
+        """
         node = self.tree
+        if multi_obs == True:
+            predictions = []
+            for obs in inputs:
+                # Have to reassign node to root node or else will make
+                # all the same predictions!!!
+                node = self.tree
+                while node.left:
+                    if obs[node.feature_index] < node.threshold:
+                        node = node.left
+                    else:
+                        node = node.right
+                predictions.append(node.predicted_class)
+            return np.array(predictions)
+
         while node.left:
             if inputs[node.feature_index] < node.threshold:
                 node = node.left
