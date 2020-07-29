@@ -1,4 +1,8 @@
 import numpy as np
+# To make sure the target variable is ordinally encoded, use sklearn preprocessing
+    # Can be commented out so algorithm functionality still works if y data is already in correct format
+from sklearn.preprocessing import OrdinalEncoder
+import warnings
 
 class Node:
     """[Node class to build the decision tree with]
@@ -82,55 +86,86 @@ class DecisionTreeClassifier:
 
         Returns
         -------
-        ideal_index: [int]
+        ideal_col: [int]
                      [Column index of ideal feature to split on]
         ideal_threshold: [int]
                          [Ideal threshold value of the best feature to split on]
         """
-        # Check to see there are at least 2 observations
+        # Check to see if there are at least 2 observations
         num_observations = y.size
         if num_observations <= 1:
             return None, None
         
-        num_parent = [np.sum(y == c) for c in range(self.num_classes)]
-        best_gini = 1.0 - sum((n / num_observations) ** 2 for n in num_parent)
-        ideal_index, ideal_threshold = None, None
-        for idx in range(self.num_features):
-            thresholds, classes = zip(*sorted(zip(X[:, idx], y)))
+        # Make sure that the target, y, values are ordinally encoded integers
+            # Reshape y array so it works w/ ordinal encoder
+        y = y.reshape(-1, 1)
+        encoder = OrdinalEncoder()
+        y = encoder.fit_transform(y)
+        y = y.astype(int)
+
+        # Reshape y back to shape (y.size,)
+        y = y.reshape(num_observations,)
+        print(y.dtype)
+        
+        # Find the count of each class for use in Gini calc later
+            # To avoid warning message + future issues:
+                #  locked the numpy and python versions
+                #  suppress warning with default warnings library (still runs without it)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', category=FutureWarning)
+            count_in_parent = [np.count_nonzero(y == c) for c in range(self.num_classes)]
+
+        # Set default value of best_gini to the gini impurity value of the parent node
+            # Good article on gini impurity here: https://victorzhou.com/blog/gini-impurity/
+        best_gini = 1.0 - sum((n / num_observations) ** 2 for n in count_in_parent)
+
+        # Set default values of ideal column and threshold to None
+        ideal_col = None
+        ideal_threshold = None
+        # Loop through the columns in X
+        for col in range(self.num_features):
+            # Sort X and y by values of X in col
+                # Allows us to more easily find the ideal threshold
+                    # Better time complexity -> https://towardsdatascience.com/decision-tree-from-scratch-in-python-46e99dfea775
+                # Sort the zipped list of tuples, then unzip with zip(*)
+                    # thresholds and observed classes are tuples with their respective values sorted in the same order
+                        # Zip, sorted, unzip explanation -> https://realpython.com/python-zip-function/
+            thresholds, obs_classes = zip(*sorted(zip(X[:, col], y)))
+            
+            # Keep track of how many of each class are going to each child node
+                # Default is 0 of all classes to left and everything to right
             num_left = [0] * self.num_classes
-            num_right = num_parent.copy()
-            for i in range(1, m):
-                c = classes[i - 1]
+            num_right = count_in_parent.copy()
+            for i in range(1, num_observations):
+                c = obs_classes[i - 1]
                 num_left[c] += 1
                 num_right[c] -= 1
-                gini_left = 1.0 - sum(
-                    (num_left[x] / i) ** 2 for x in range(self.num_classes)
-                )
-                gini_right = 1.0 - sum(
-                    (num_right[x] / (num_observations - i)) ** 2 for x in range(self.num_classes)
-                )
+                gini_left = 1.0 - sum((num_left[x] / i) ** 2 for x in range(self.num_classes))
+                gini_right = 1.0 - sum((num_right[x] / (num_observations - i)) ** 2 for x in range(self.num_classes))
                 gini = (i * gini_left + (num_observations - i) * gini_right) / num_observations
                 if thresholds[i] == thresholds[i - 1]:
                     continue
                 if gini < best_gini:
                     best_gini = gini
-                    ideal_index = idx
+                    ideal_col = col
                     ideal_threshold = (thresholds[i] + thresholds[i - 1]) / 2
-        return ideal_index, ideal_threshold
+        return ideal_col, ideal_threshold
 
     def grow_tree(self, X, y, depth=0):
-        # num_samples_per_class is the population for each class of target in current node
-        num_samples_per_class = [np.sum(y == i) for i in range(self.num_classes)]
+        # Get the population for each class of target in current node
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', category=FutureWarning)
+            pop_per_class = [np.count_nonzero(y == i) for i in range(self.num_classes)]
         # predicted_class is the class w/ highest population
-        predicted_class = np.argmax(num_samples_per_class)
+        predicted_class = np.argmax(pop_per_class)
         node = Node(predicted_class=predicted_class)
         if depth < self.max_depth:
-            idx, thr = self.find_split(X, y)
-            if idx is not None:
-                indices_left = X[:, idx] < thr
+            col, thr = self.find_split(X, y)
+            if col is not None:
+                indices_left = X[:, col] < thr
                 X_left, y_left = X[indices_left], y[indices_left]
                 X_right, y_right = X[~indices_left], y[~indices_left]
-                node.feature_index = idx
+                node.feature_index = col
                 node.threshold = thr
                 node.left = self.grow_tree(X_left, y_left, depth + 1)
                 node.right = self.grow_tree(X_right, y_right, depth + 1)
