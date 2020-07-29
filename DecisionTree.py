@@ -11,11 +11,11 @@ class Node:
             Target value with the most occurances
         [Feature Index]:
             Column index of the feature that the node splits on
-        -[Threshold]:
+        [Threshold]:
             Value of the feature that the node splits on
-        -[Left]:
+        [Left]:
             Node for under the threshold
-        -[Right]:
+        [Right]:
             Node for over the threshold
 
     """
