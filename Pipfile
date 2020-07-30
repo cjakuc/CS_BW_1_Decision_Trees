@@ -9,6 +9,7 @@ verify_ssl = true
 numpy = "1.19"
 scikit-learn = "*"
 matplotlib = "*"
+seaborn = "*"
 
 [requires]
 python_version = "3.7"
