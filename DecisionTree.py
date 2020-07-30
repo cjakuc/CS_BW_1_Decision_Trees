@@ -238,7 +238,11 @@ class DecisionTreeClassifier:
         node.samples = y.size
 
         # If depth >= max_depth then leave it empty and return it
-            # Else grow the tree recursively and return it
+            # Else
+                # Grow the tree recursively
+                    # Find the new best split
+                    # Use the new subset of X and y to grow the tree
+                    # Make left/right branch True
         if depth < self.max_depth:
             col, threshold = self.find_split(X, y)
             if col and threshold:
@@ -264,7 +268,7 @@ class DecisionTreeClassifier:
 
         Returns
         -------
-        [integer or np.Array of shape (observations, 1)]
+        [np.Array of shape (observations, )]
             [Predicted target class(es) of the test data]
         """
         node = self.tree
