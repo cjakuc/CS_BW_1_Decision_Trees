@@ -128,10 +128,14 @@ class DecisionTreeClassifier:
         ideal_threshold: [int]
                          [Ideal threshold value of the best feature to split on]
         """
+        # Set default values of ideal column and threshold to None
+        ideal_col = None
+        ideal_threshold = None
+
         # Check to see if there are at least 1 observations
         num_observations = y.size
         if num_observations <= 1:
-            return None, None
+            return ideal_col, ideal_threshold
         
         # Reshape y back to shape (y.size,)
         y = y.reshape(num_observations,)
@@ -148,9 +152,6 @@ class DecisionTreeClassifier:
             # Good article on gini impurity here: https://victorzhou.com/blog/gini-impurity/
         best_gini = 1.0 - sum((n / num_observations) ** 2 for n in count_in_parent)
 
-        # Set default values of ideal column and threshold to None
-        ideal_col = None
-        ideal_threshold = None
         # Create a temp version of Y in the right shape for concatenating
         temp_y = y.reshape(y.shape[0],1)
         # Loop through the columns in X
