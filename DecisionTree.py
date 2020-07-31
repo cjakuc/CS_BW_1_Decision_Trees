@@ -1,7 +1,6 @@
 import numpy as np
 # To make sure the target variable is ordinally encoded, use sklearn preprocessing
     # Can be commented out so algorithm functionality still works if y data is already in correct format
-from sklearn.preprocessing import OrdinalEncoder
 import warnings
 
 class Node:
@@ -17,7 +16,13 @@ class Node:
             Node for under the threshold
         [Right]:
             Node for over the threshold
-
+        [Leftbranch]:
+            Is the node a left branch from its parent
+        [Rightbranch]:
+            Is the node a right branch from its parent
+        [Depth]:
+            Attribute used in testing to ensure that the print and fit methods were working correctly
+                Still included in the grow_tree method but took out of print
     """
     def __init__(self, predicted_class, depth=None):
         self.predicted_class = predicted_class
@@ -55,7 +60,6 @@ def print_help(root, space, count=[10]):
             print(f"Right Leaf -> Predicted Class: {root.predicted_class}, Samples: {root.samples}")
     else:
         msg = f"X{root.feature_index}, Threshold: {root.threshold}, Predicted Class: {root.predicted_class}, Samples: {root.samples}"
-        # msg = msg + "\n" + root.left.print_help(depth=depth+1) + "\n" + root.right.print_help(depth=depth+1)
         print(msg)
 
     # Go left
@@ -83,7 +87,6 @@ class DecisionTreeClassifier:
             # Base case = right and left == None
                 # Return "X{feature_index}, Threshold: {threshold}, Predicted Class: {predicted class}"
         print_help(node, 0)
-        return ""
 
     def fit(self, X:np.array, y:np.array):
         """[Function to fit a decision tree classifier]
@@ -107,21 +110,6 @@ class DecisionTreeClassifier:
         self.num_classes = len(np.unique(y))
         self.num_features = X.shape[1]
         self.tree = self.grow_tree(X, y)
-
-    def predict(self, X):
-        """[Function to predict target(y) values for input feature data(X)]
-
-        Parameters
-        ----------
-        X : [NumPy Array]
-            [Test data]
-
-        Returns
-        -------
-        [NumPy Array]
-            [Predicted target(y) value(s) for each row in test data (X)]
-        """
-        return [self._predict(inputs) for inputs in X]
 
     def find_split(self, X, y):
         """[Helper function to locate the ideal feature and threshold to split on. Called within grow_tree()]
@@ -258,7 +246,7 @@ class DecisionTreeClassifier:
                 node.right.rightbranch = True
         return node
 
-    def _predict(self, X_test):
+    def predict(self, X_test):
         """[Function to predict using new X input(s)]
 
         Parameters
