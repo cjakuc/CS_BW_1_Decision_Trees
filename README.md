@@ -1,1 +1,1 @@
-Check out my implementation of a Decision Tree Classifier using NumPy! A thorough explanation of my proccess can be found on [my Medium profile here](https://medium.com/@cjakuc/building-a-decision-tree-classifier-c00a08815c3).
+Check out my implementation of a Decision Tree Classifier using NumPy! A thorough explanation of my process can be found on [my Medium profile here](https://medium.com/@cjakuc/building-a-decision-tree-classifier-c00a08815c3).
